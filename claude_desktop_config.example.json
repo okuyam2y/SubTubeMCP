@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "youtube": {
+      "command": "node",
+      "args": ["/path/to/YoutubeMcpServer/dist/index.js"],
+      "env": {
+        "YOUTUBE_API_KEY": "YOUR_YOUTUBE_API_KEY_HERE",
+        "MCP_LOG_FILE": "/tmp/youtube-mcp.log"
+      }
+    }
+  }
+}

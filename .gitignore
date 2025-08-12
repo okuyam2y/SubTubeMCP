@@ -1,0 +1,64 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Environment variables - IMPORTANT: Never commit API keys
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+tests/
+coverage/
+.nyc_output
+c8_output/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+/tmp/
+*.vtt
+*.srt
+*_cleaned.*
+process_subtitle.js
+
+# Cache
+.cache/
+.npm/
+.eslintcache
+
+# OS files
+Thumbs.db
+
+# MCP Inspector
+.mcp-inspector/
+
+# Claude Desktop config (contains API keys)
+claude_desktop_config.json
+\!claude_desktop_config.example.json
+EOF < /dev/null
