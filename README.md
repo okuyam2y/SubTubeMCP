@@ -1,6 +1,8 @@
 # YouTube MCP Server
 
-YouTubeの動画検索、チャンネル統計、トレンド動画、動画メタデータ、字幕取得、コメント取得など、YouTubeの情報を包括的に取得できるMCP (Model Context Protocol) サーバーです。
+Claude DesktopなどのMCP対応アプリケーションからYouTubeを自在に操作できるMCP (Model Context Protocol) サーバーです。
+
+動画の検索、内容要約、トレンド分析、字幕取得、コメント収集など、YouTubeの情報を包括的に取得・分析できます。AIアシスタントがYouTube動画の内容を理解し、質問に答えたり、要約を作成したりすることが可能になります。
 
 ## 🌟 主な特徴
 
@@ -38,8 +40,8 @@ YouTubeの動画検索、チャンネル統計、トレンド動画、動画メ�
 
 1. リポジトリをクローン:
 ```bash
-git clone https://github.com/okuyam2y/YoutubeMcpServer.git
-cd YoutubeMcpServer
+git clone https://github.com/okuyam2y/SubTubeMCP.git
+cd SubTubeMCP
 ```
 
 2. 依存関係をインストール:
@@ -327,7 +329,7 @@ MIT
 ## 🤝 貢献
 
 Issue や Pull Request は大歓迎です！
-[GitHub リポジトリ](https://github.com/okuyam2y/YoutubeMcpServer)
+[GitHub リポジトリ](https://github.com/okuyam2y/SubTubeMCP)
 
 ## ⚠️ 注意事項
 
