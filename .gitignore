@@ -32,7 +32,6 @@ lerna-debug.log*
 .DS_Store
 
 # Testing
-tests/
 coverage/
 .nyc_output
 c8_output/

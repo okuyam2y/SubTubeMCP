@@ -2,6 +2,7 @@ import { CommentsArgs } from '../types/index.js';
 import { log } from '../utils/logger.js';
 import { Validator } from '../utils/validation.js';
 import { createJsonResponse, createErrorResponse } from '../utils/helpers.js';
+import { CommentFilter, CommentFilterOptions } from '../utils/commentFilter.js';
 
 export class CommentHandler {
   private youtube: any;
@@ -11,7 +12,22 @@ export class CommentHandler {
   }
 
   async getComments(args: CommentsArgs) {
-    const { videoId, maxResults = 20, sortBy = 'relevance', lang, pageToken, fetchAll = false } = args;
+    const { videoId, maxResults = 20, sortBy = 'relevance', lang, pageToken, fetchAll = false, noFilter = false } = args;
+    
+    // Get video metadata to find the channel ID of the video author
+    let videoAuthorChannelId: string | undefined;
+    try {
+      const videoResponse = await this.youtube.videos.list({
+        part: ['snippet'],
+        id: [videoId]
+      });
+      if (videoResponse.data.items && videoResponse.data.items.length > 0) {
+        videoAuthorChannelId = videoResponse.data.items[0].snippet.channelId;
+        log('DEBUG', `Video author channel ID: ${videoAuthorChannelId}`);
+      }
+    } catch (error) {
+      log('WARN', `Failed to get video author channel ID: ${error}`);
+    }
     
     const cleanVideoId = Validator.validateVideoId(videoId);
     const limitedMaxResults = Validator.validateMaxResults(maxResults, 20, 100);
@@ -22,7 +38,7 @@ export class CommentHandler {
       // If fetchAll is true, recursively fetch all pages
       if (fetchAll) {
         log('DEBUG', `Fetching ALL comments for video ${cleanVideoId}`);
-        return await this.fetchAllComments(cleanVideoId, sortBy, lang);
+        return await this.fetchAllComments(cleanVideoId, sortBy, lang, noFilter);
       }
       
       log('DEBUG', `Fetching comments for video ${cleanVideoId}, max: ${limitedMaxResults}, sort: ${sortBy}`);
@@ -103,12 +119,26 @@ export class CommentHandler {
         }
       }
       
+      // Apply comment filtering (unless disabled)
+      const filterOptions: CommentFilterOptions = {
+        enableFiltering: !noFilter
+      };
+      
+      const originalCount = comments.length;
+      if (!noFilter) {
+        comments = CommentFilter.filterComments(comments, filterOptions, videoAuthorChannelId);
+        const filterStats = CommentFilter.getFilterStats(comments, filterOptions, videoAuthorChannelId);
+        log('DEBUG', `Filtered ${originalCount - comments.length} comments (${filterStats.filterRate} filtered)`);
+      }
+      
       const result = {
         videoId: cleanVideoId,
         totalResults: response.data.pageInfo?.totalResults || comments.length,
         fetchedCount: comments.length,
         sortBy: sortBy,
         language: lang || 'all',
+        filtering: !noFilter ? 'enabled' : 'disabled',
+        filteredCount: !noFilter ? originalCount - comments.length : 0,
         nextPageToken: response.data.nextPageToken,
         prevPageToken: response.data.prevPageToken,
         hasMore: !!response.data.nextPageToken,
@@ -128,12 +158,27 @@ export class CommentHandler {
     }
   }
 
-  private async fetchAllComments(videoId: string, sortBy: string = 'relevance', lang?: string) {
+  private async fetchAllComments(videoId: string, sortBy: string = 'relevance', lang?: string, noFilter: boolean = false) {
     const allComments = [];
     let nextPageToken = undefined;
     let pageCount = 0;
     const maxPages = 10; // Limit to prevent quota exhaustion
     const maxCommentsPerPage = 100; // YouTube API maximum
+    
+    // Get video metadata to find the channel ID of the video author
+    let videoAuthorChannelId: string | undefined;
+    try {
+      const videoResponse = await this.youtube.videos.list({
+        part: ['snippet'],
+        id: [videoId]
+      });
+      if (videoResponse.data.items && videoResponse.data.items.length > 0) {
+        videoAuthorChannelId = videoResponse.data.items[0].snippet.channelId;
+        log('DEBUG', `Video author channel ID: ${videoAuthorChannelId}`);
+      }
+    } catch (error) {
+      log('WARN', `Failed to get video author channel ID: ${error}`);
+    }
     
     try {
       do {
@@ -228,17 +273,33 @@ export class CommentHandler {
         
       } while (nextPageToken);
       
+      // Apply comment filtering to all collected comments (unless disabled)
+      let finalComments = allComments;
+      let filteredCount = 0;
+      
+      if (!noFilter) {
+        const filterOptions: CommentFilterOptions = {
+          enableFiltering: true
+        };
+        const originalCount = allComments.length;
+        finalComments = CommentFilter.filterComments(allComments, filterOptions, videoAuthorChannelId);
+        filteredCount = originalCount - finalComments.length;
+        log('DEBUG', `Filtered ${filteredCount} comments out of ${originalCount} total`);
+      }
+      
       const result = {
         videoId: videoId,
-        totalResults: allComments.length,
-        fetchedCount: allComments.length,
+        totalResults: finalComments.length,
+        fetchedCount: finalComments.length,
         sortBy: sortBy,
         language: lang || 'all',
+        filtering: !noFilter ? 'enabled' : 'disabled',
+        filteredCount: filteredCount,
         pagesProcessed: pageCount,
-        comments: allComments,
+        comments: finalComments,
         message: pageCount >= maxPages 
-          ? `Fetched ${allComments.length} comments (limited to ${maxPages} pages to prevent quota exhaustion)` 
-          : `Fetched all ${allComments.length} comments from ${pageCount} pages`
+          ? `Fetched ${finalComments.length} comments (limited to ${maxPages} pages to prevent quota exhaustion)` 
+          : `Fetched all ${finalComments.length} comments from ${pageCount} pages`
       };
       
       log('DEBUG', `Successfully fetched ${allComments.length} comments across ${pageCount} pages`);

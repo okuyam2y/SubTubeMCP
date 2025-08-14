@@ -38,6 +38,7 @@ export interface CommentsArgs {
   lang?: string;
   pageToken?: string;
   fetchAll?: boolean;  // Fetch all comments using pagination
+  noFilter?: boolean;  // Disable comment filtering (show all comments including spam/noise)
 }
 
 export interface ChannelVideosArgs {

@@ -57,13 +57,14 @@ https://www.youtube.com/watch?v=xxxxx
 https://www.youtube.com/watch?v=xxxxx
 ```
 
-## 💬 コメント取得
+## 💬 コメント取得（スパムフィルタリング機能付き）
 
-### 全コメント取得
+### 全コメント取得（フィルタリング適用）
 ```
 この動画のコメントを全部取得して
 https://www.youtube.com/watch?v=xxxxx
 ```
+※ デフォルトでスパム・ノイズ・Bot系コメントは除外されます
 
 ### 最新コメント
 ```
@@ -80,6 +81,12 @@ https://www.youtube.com/watch?v=xxxxx
 ### 人気コメント
 ```
 この動画の人気コメントトップ20を見せて
+https://www.youtube.com/watch?v=xxxxx
+```
+
+### フィルタリング無効化（全コメント表示）
+```
+この動画のコメントをフィルタリングなしで全部見せて
 https://www.youtube.com/watch?v=xxxxx
 ```
 
@@ -220,7 +227,7 @@ https://www.youtube.com/watch?v=xxxxx
 | get_transcript | 字幕取得（3モード対応） | 不要 |
 | download_subtitles | 字幕ファイルダウンロード | 不要 |
 | list_available_subtitles | 利用可能字幕一覧 | 不要 |
-| get_comments | コメント取得（ページネーション対応） | 必要 |
+| get_comments | コメント取得（ページネーション対応・スパムフィルタリング付き） | 必要 |
 | get_channel_stats | チャンネル統計 | 必要 |
 | get_channel_videos | チャンネル動画一覧（yt-dlp自動使用） | 必要 |
 | get_trending_videos | トレンド動画 | 必要 |
@@ -267,12 +274,14 @@ https://www.youtube.com/watch?v=xxxxx
   "maxResults": 100,
   "sortBy": "relevance",  // relevance, new
   "lang": "ja",
-  "fetchAll": true  // 全コメント取得
+  "fetchAll": true,  // 全コメント取得
+  "noFilter": false  // falseでフィルタリング有効（デフォルト）、trueで無効
 }
 ```
 
 ## 📝 更新履歴
 
+- **v1.6.0**: コメントスクリーニング機能追加（スパム・ノイズ・Bot系コメントの自動除外）
 - **v1.5.0**: プログレッシブ重複削除、話者ラベル保持、maxSegments 5000対応
 - **v1.4.0**: 使い方ガイド追加、コードモジュール化
 - **v1.3.0**: コメント全数取得機能追加（ページネーション対応）

@@ -181,7 +181,8 @@ class YouTubeMCPServer {
                 },
                 lang: { type: 'string', description: 'Filter comments by language (e.g., ja, en)' },
                 pageToken: { type: 'string', description: 'Page token for pagination' },
-                fetchAll: { type: 'boolean', description: 'Fetch all comments using pagination (limited to 10 pages)' }
+                fetchAll: { type: 'boolean', description: 'Fetch all comments using pagination (limited to 10 pages)' },
+                noFilter: { type: 'boolean', description: 'Disable spam/noise filtering (default: false, filtering enabled)' }
               },
               required: ['videoId']
             }
