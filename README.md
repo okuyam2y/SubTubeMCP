@@ -1,8 +1,6 @@
 # YouTube MCP Server
 
-Claude DesktopなどのMCP対応アプリケーションからYouTubeを自在に操作できるMCP (Model Context Protocol) サーバーです。
-
-動画の検索、内容要約、トレンド分析、字幕取得、コメント収集など、YouTubeの情報を包括的に取得・分析できます。AIアシスタントがYouTube動画の内容を理解し、質問に答えたり、要約を作成したりすることが可能になります。
+YouTubeの動画検索、チャンネル統計、トレンド動画、動画メタデータ、字幕取得、コメント取得など、YouTubeの情報を包括的に取得できるMCP (Model Context Protocol) サーバーです。
 
 ## 🌟 主な特徴
 
@@ -95,7 +93,7 @@ export YOUTUBE_API_KEY="your-youtube-api-key"
   "mcpServers": {
     "youtube": {
       "command": "node",
-      "args": ["/path/to/YoutubeMcpServer/dist/index.js"],
+      "args": ["/path/to/SubTubeMCP/dist/index.js"],
       "env": {
         "YOUTUBE_API_KEY": "your-youtube-api-key-here",
         "MCP_LOG_FILE": "/tmp/youtube-mcp.log"
@@ -111,7 +109,7 @@ export YOUTUBE_API_KEY="your-youtube-api-key"
   "mcpServers": {
     "youtube": {
       "command": "node",
-      "args": ["C:\\Users\\YourName\\YoutubeMcpServer\\dist\\index.js"],
+      "args": ["C:\\Users\\YourName\\SubTubeMCP\\dist\\index.js"],
       "env": {
         "YOUTUBE_API_KEY": "your-youtube-api-key-here",
         "MCP_LOG_FILE": "C:\\temp\\youtube-mcp.log"
@@ -220,7 +218,7 @@ https://www.youtube.com/watch?v=xxxxx
 ## 🏗️ プロジェクト構造
 
 ```
-YoutubeMcpServer/
+SubTubeMCP/
 ├── src/
 │   ├── index.ts           # メインサーバー
 │   ├── handlers/          # 機能別ハンドラー
@@ -235,21 +233,9 @@ YoutubeMcpServer/
 │   └── types/             # 型定義
 ├── dist/                  # ビルド済みファイル
 ├── temp/                  # 一時ファイル（.gitignore）
-├── package.json           # Node.js依存関係とスクリプト定義
-├── package-lock.json      # 依存関係のバージョンロック
-├── tsconfig.json          # TypeScriptコンパイラ設定
-├── claude_desktop_config.example.json  # Claude Desktop設定サンプル
-├── yt-dlp-config.json     # yt-dlp（字幕取得）の設定
 ├── USAGE_GUIDE.md         # 詳細な使い方ガイド
 └── README.md              # このファイル
 ```
-
-### 📄 主要ファイルの説明
-
-- **claude_desktop_config.example.json**: Claude Desktop用の設定ファイルサンプル。実際の環境に合わせてパスとAPIキーを設定してください
-- **yt-dlp-config.json**: YouTube字幕取得時の詳細設定（ユーザーエージェント、リクエストヘッダー等）。通常は変更不要
-- **package.json**: プロジェクトの依存関係とnpmスクリプトを定義
-- **tsconfig.json**: TypeScriptのコンパイル設定
 
 ## 🔧 開発
 
@@ -311,7 +297,6 @@ YouTube API使用量が制限を超えた場合：
 - 💬 話者ラベル保持機能追加
 - 🧹 字幕クリーニング処理の改善
 - 📈 最大セグメント数を5000に増加（6時間動画対応）
-- 📁 ファイル構造の整理（temp/ディレクトリ）
 
 ### v1.4.0 (2024-12-12)
 - 📚 使い方ガイド（USAGE_GUIDE.md）追加
