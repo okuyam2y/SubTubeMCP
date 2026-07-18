@@ -15,7 +15,7 @@ export function log(level: string, message: string, ...args: any[]) {
   if (LOG_FILE) {
     try {
       appendFileSync(LOG_FILE, fullMessage + '\n');
-    } catch (error) {
+    } catch {
       // Ignore file write errors
     }
   }

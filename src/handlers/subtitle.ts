@@ -5,7 +5,15 @@ import os from 'os';
 import { TranscriptArgs, SubtitleArgs } from '../types/index.js';
 import { log } from '../utils/logger.js';
 import { Validator } from '../utils/validation.js';
-import { execAsync, spawnAsync, formatDuration, checkYtDlp, createJsonResponse, createErrorResponse } from '../utils/helpers.js';
+import { spawnAsync, formatDuration, checkYtDlp, createJsonResponse } from '../utils/helpers.js';
+
+const FULL_TEXT_LIMIT = 50000;
+
+interface ProcessedTranscript {
+  segments: any[];
+  isTruncated: boolean;
+  message?: string;
+}
 
 export class SubtitleHandler {
   async getTranscript(args: TranscriptArgs) {
@@ -23,7 +31,7 @@ export class SubtitleHandler {
         transcriptData = await YoutubeTranscript.fetchTranscript(cleanVideoId, {
           lang: lang
         });
-      } catch (firstError: any) {
+      } catch {
         log('DEBUG', `Failed with ${lang}, trying alternative approaches...`);
         
         // Approach 2: For Japanese, try with 'ja' explicitly
@@ -32,7 +40,7 @@ export class SubtitleHandler {
             transcriptData = await YoutubeTranscript.fetchTranscript(cleanVideoId, {
               lang: 'ja'
             });
-          } catch (e) {
+          } catch {
             log('DEBUG', 'Japanese transcript not found, trying auto-generated...');
           }
         }
@@ -41,7 +49,7 @@ export class SubtitleHandler {
         if (!transcriptData) {
           try {
             transcriptData = await YoutubeTranscript.fetchTranscript(cleanVideoId);
-          } catch (e) {
+          } catch {
             log('DEBUG', 'Default transcript failed, will try yt-dlp fallback');
           }
         }
@@ -69,15 +77,12 @@ export class SubtitleHandler {
       // Apply smart sampling or truncation based on mode
       const processedTranscript = this.processTranscript(transcript, mode, maxSegments);
       
-      return createJsonResponse({
+      return this.createTranscriptResponse({
         language: lang,
         mode: mode,
-        fullText: fullText.length > 50000 ? fullText.substring(0, 50000) + '...' : fullText,
-        wordCount: fullText.split(/\s+/).length,
+        fullText,
         totalSegments: transcript.length,
-        segments: processedTranscript.segments,
-        isTruncated: processedTranscript.isTruncated,
-        message: processedTranscript.message
+        processedTranscript
       });
     } catch (error: any) {
       if (error.message.includes('Could not find')) {
@@ -141,7 +146,7 @@ export class SubtitleHandler {
               videoUrl
             ];
             
-            const { stdout } = await spawnAsync('yt-dlp', args, { 
+            await spawnAsync('yt-dlp', args, {
               cwd: tempDir,
               timeout: 20000 
             });
@@ -169,17 +174,14 @@ export class SubtitleHandler {
               // Apply smart sampling based on mode
               const processedTranscript = this.processTranscript(segments, mode, maxSegments);
               
-              return createJsonResponse({
+              return this.createTranscriptResponse({
                 language: lang === 'auto' ? 'ja' : lang,
                 mode: mode,
-                fullText: fullText.length > 50000 ? fullText.substring(0, 50000) + '...' : fullText,
-                wordCount: fullText.split(/\s+/).length,
+                fullText,
                 totalSegments: segments.length,
-                segments: processedTranscript.segments,
                 source: 'yt-dlp',
                 method: attempt.desc,
-                isTruncated: processedTranscript.isTruncated,
-                message: processedTranscript.message
+                processedTranscript
               });
             }
           } catch (cmdError: any) {
@@ -269,7 +271,58 @@ export class SubtitleHandler {
     return 0;
   }
   
-  private processTranscript(segments: any[], mode: string, maxSegments: number): { segments: any[], isTruncated: boolean, message?: string } {
+  private createTranscriptResponse({
+    language,
+    mode,
+    fullText,
+    totalSegments,
+    processedTranscript,
+    source,
+    method
+  }: {
+    language: string;
+    mode: string;
+    fullText: string;
+    totalSegments: number;
+    processedTranscript: ProcessedTranscript;
+    source?: string;
+    method?: string;
+  }) {
+    const fullTextTruncated = fullText.length > FULL_TEXT_LIMIT;
+    const fullTextReturnedLength = Math.min(fullText.length, FULL_TEXT_LIMIT);
+    const messages = processedTranscript.message ? [processedTranscript.message] : [];
+
+    if (fullTextTruncated) {
+      messages.push(
+        `Full text truncated to first ${fullTextReturnedLength} of ${fullText.length} characters. ` +
+        'Remaining text is not included in fullText; use the returned segments, or request mode "full" ' +
+        'with a larger maxSegments value when segmentTruncated is true.'
+      );
+    }
+
+    return createJsonResponse({
+      language,
+      mode,
+      fullText: fullTextTruncated ? fullText.substring(0, FULL_TEXT_LIMIT) + '...' : fullText,
+      wordCount: fullText.split(/\s+/).length,
+      totalSegments,
+      segments: processedTranscript.segments,
+      ...(source ? { source } : {}),
+      ...(method ? { method } : {}),
+      isTruncated: processedTranscript.isTruncated || fullTextTruncated,
+      segmentTruncated: processedTranscript.isTruncated,
+      fullTextTruncated,
+      fullTextOriginalLength: fullText.length,
+      fullTextReturnedLength,
+      fullTextRange: {
+        start: 0,
+        endExclusive: fullTextReturnedLength
+      },
+      message: messages.length > 0 ? messages.join(' ') : undefined
+    });
+  }
+
+  private processTranscript(segments: any[], mode: string, maxSegments: number): ProcessedTranscript {
     if (segments.length <= maxSegments) {
       return {
         segments,
@@ -365,15 +418,16 @@ export class SubtitleHandler {
     let i = 0;
     
     while (i < lines.length) {
+      // Metadata blocks continue until the next blank line. Handle them before
+      // the single-line skip predicate so their bodies cannot be parsed as cues.
+      if (/^(?:NOTE|STYLE|REGION)(?:\s|$)/.test(lines[i].trim())) {
+        i = this.skipVttNoteBlock(lines, i);
+        continue;
+      }
+
       // Skip WEBVTT header, metadata blocks, and empty lines
       if (this.shouldSkipVttLine(lines[i])) {
         i++;
-        continue;
-      }
-      
-      // Skip NOTE blocks completely
-      if (lines[i].trim() === 'NOTE') {
-        i = this.skipVttNoteBlock(lines, i);
         continue;
       }
       
@@ -426,7 +480,12 @@ export class SubtitleHandler {
   private cleanSubtitleText(text: string): string {
     let cleaned = text.trim();
     
-    // Decode HTML entities first (before removing tags)
+    // Remove actual HTML/VTT tags before decoding escaped literal text.
+    cleaned = cleaned.replace(/<\d{2}:\d{2}:\d{2}\.\d{3}>/g, '');
+    cleaned = cleaned.replace(/<\/?[a-zA-Z][^>]*>/g, '');
+
+    // Decode HTML entities after tag removal so escaped literals such as
+    // &lt;test&gt; remain visible text rather than being mistaken for tags.
     cleaned = cleaned
       .replace(/&amp;/g, '&')
       .replace(/&lt;/g, '<')
@@ -438,18 +497,15 @@ export class SubtitleHandler {
         const code = parseInt(num);
         // Skip zero-width spaces and other invisible characters
         if (code === 8203 || code === 8204 || code === 8205) return '';
-        return String.fromCharCode(code);
+        if (code > 0x10FFFF || (code >= 0xD800 && code <= 0xDFFF)) return '\uFFFD';
+        return String.fromCodePoint(code);
       })
       .replace(/&#x([0-9a-fA-F]+);/g, (match, hex) => {
         const code = parseInt(hex, 16);
         if (code === 8203 || code === 8204 || code === 8205) return '';
-        return String.fromCharCode(code);
+        if (code > 0x10FFFF || (code >= 0xD800 && code <= 0xDFFF)) return '\uFFFD';
+        return String.fromCodePoint(code);
       });
-    
-    // Remove HTML/VTT timing tags (after decoding entities)
-    // Match tags like <c>, <00:00:01.000>, etc.
-    cleaned = cleaned.replace(/<\d{2}:\d{2}:\d{2}\.\d{3}>/g, ''); // Remove timing tags
-    cleaned = cleaned.replace(/<\/?[a-zA-Z][^>]*>/g, ''); // Remove HTML tags
     
     // Remove music/sound indicators
     cleaned = cleaned
@@ -506,10 +562,14 @@ export class SubtitleHandler {
       'ﾜ': 'ワ', 'ｦ': 'ヲ', 'ﾝ': 'ン',
       'ｧ': 'ァ', 'ｨ': 'ィ', 'ｩ': 'ゥ', 'ｪ': 'ェ', 'ｫ': 'ォ',
       'ｬ': 'ャ', 'ｭ': 'ュ', 'ｮ': 'ョ', 'ｯ': 'ッ',
-      'ｰ': 'ー', 'ﾞ': '゛', 'ﾟ': '゜'
+      'ｰ': 'ー', 'ﾞ': '\u3099', 'ﾟ': '\u309A'
     };
     
-    return text.replace(/[ｱ-ﾝﾞﾟ]/g, char => halfToFull[char] || char);
+    return text
+      .replace(/[\uFF66-\uFF9F]/g, char => halfToFull[char] || char)
+      .normalize('NFC')
+      .replace(/\u3099/g, '\u309B')
+      .replace(/\u309A/g, '\u309C');
   }
 
   private parseVttTime(timeStr: string): number {
@@ -579,14 +639,6 @@ export class SubtitleHandler {
         const outputPath = path.join(tempDir, 'subtitle');
         const formatOption = format === 'best' ? '' : `--sub-format ${format}`;
         
-        // Enhanced impersonation options
-        const impersonationOptions = [
-          '--user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"',
-          '--referer "https://www.youtube.com/"',
-          '--add-header "Accept-Language:ja,en;q=0.9"',  // Prefer Japanese
-          '--extractor-args "youtube:player_client=android,web"'
-        ].join(' ');
-        
         // Use spawn for secure command execution - no shell injection possible
         const args = [
           '--skip-download',
@@ -600,7 +652,7 @@ export class SubtitleHandler {
           videoUrl
         ];
         
-        const { stdout, stderr } = await spawnAsync('yt-dlp', args, {
+        await spawnAsync('yt-dlp', args, {
           cwd: tempDir,
           timeout: 30000  // 30 second timeout
         });
@@ -670,13 +722,6 @@ export class SubtitleHandler {
     }
 
     try {
-      // Enhanced impersonation options for listing subtitles
-      const impersonationOptions = [
-        '--user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"',
-        '--referer "https://www.youtube.com/"',
-        '--extractor-args "youtube:player_client=android,web"'
-      ].join(' ');
-      
       // Use spawn for secure command execution
       const args = [
         '--list-subs',
@@ -767,19 +812,19 @@ export class SubtitleHandler {
    * Helper method to check if a VTT line should be skipped
    */
   private shouldSkipVttLine(line: string): boolean {
-    return line.startsWith('WEBVTT') || 
-           line.startsWith('NOTE') ||
-           line.startsWith('STYLE') ||
-           line.startsWith('REGION') ||
+    return /^WEBVTT(?:\s|$)/.test(line) ||
+           /^NOTE(?:\s|$)/.test(line) ||
+           /^STYLE(?:\s|$)/.test(line) ||
+           /^REGION(?:\s|$)/.test(line) ||
            line.trim() === '';
   }
 
   /**
-   * Helper method to skip VTT NOTE blocks
+   * Helper method to skip VTT metadata blocks
    */
   private skipVttNoteBlock(lines: string[], currentIndex: number): number {
     let i = currentIndex + 1;
-    while (i < lines.length && lines[i].trim() !== '' && !lines[i].includes('-->')) {
+    while (i < lines.length && lines[i].trim() !== '') {
       i++;
     }
     return i;

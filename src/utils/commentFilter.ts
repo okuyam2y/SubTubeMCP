@@ -48,16 +48,12 @@ export class CommentFilter {
       for (const pattern of this.SPAM_PATTERNS) {
         pattern.lastIndex = 0; // Reset regex state for global patterns
         if (pattern.test(text)) {
-          console.log(`[FILTER DEBUG] Comment filtered by SPAM_PATTERN: ${pattern}`);
-          console.log(`[FILTER DEBUG] Text: ${text.substring(0, 100)}...`);
           return true;
         }
       }
       
       // Check for repeated comments (spam indicator)
       if (this.isRepeatedText(text)) {
-        console.log(`[FILTER DEBUG] Comment filtered by repeated text`);
-        console.log(`[FILTER DEBUG] Text: ${text.substring(0, 100)}...`);
         return true;
       }
     }
@@ -75,15 +71,11 @@ export class CommentFilter {
       const trimmedText = text.trim();
       // Allow single emoji reactions or single character responses
       if (trimmedText.length === 0) {
-        console.log(`[FILTER DEBUG] Comment filtered by empty text`);
-        console.log(`[FILTER DEBUG] Text: ${text}`);
         return true;
       }
       
       // Check for gibberish (random character sequences)
       if (this.isGibberish(text)) {
-        console.log(`[FILTER DEBUG] Comment filtered by gibberish detection`);
-        console.log(`[FILTER DEBUG] Text: ${text.substring(0, 100)}...`);
         return true;
       }
     }
@@ -93,8 +85,6 @@ export class CommentFilter {
       for (const pattern of this.BOT_PATTERNS) {
         pattern.lastIndex = 0; // Reset regex state for global patterns
         if (pattern.test(text)) {
-          console.log(`[FILTER DEBUG] Comment filtered by BOT_PATTERN: ${pattern}`);
-          console.log(`[FILTER DEBUG] Text: ${text.substring(0, 100)}...`);
           return true;
         }
       }

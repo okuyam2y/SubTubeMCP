@@ -59,5 +59,9 @@ Thumbs.db
 
 # Claude Desktop config (contains API keys)
 claude_desktop_config.json
-\!claude_desktop_config.example.json
-EOF < /dev/null
+
+# evidence-dev methodology wiring (machine-local — regenerate via evidence-dev README steps 4-5)
+.claude/settings.local.json
+.claude/skills/*
+!.claude/skills/sync-public/
+!.claude/skills/sync-public/**
